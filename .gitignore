@@ -11,40 +11,29 @@
 *.gch
 *.pch
 
-# Linker files
+# Linker and debugger files
 *.ilk
-
-# Debugger Files
 *.pdb
 
-# Compiled Dynamic libraries
+# Compiled libraries and executables
 *.so
 *.dylib
 *.dll
 *.so.*
-
-
-# Fortran module files
 *.mod
 *.smod
-
-# Compiled Static libraries
 *.lai
 *.la
 *.a
 *.lib
-
-# Executables
 *.exe
 *.out
 *.app
 
-# Build directories
+# Build directories and CMake output
 build/
 Build/
 build-*/
-
-# CMake generated files
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
@@ -52,18 +41,35 @@ Makefile
 install_manifest.txt
 compile_commands.json
 
-# Temporary files
+# Temporary files and test output
 *.tmp
 *.log
 *.bak
 *.swp
-
-# vcpkg
-vcpkg_installed/
-
-# debug information files
-*.dwo
-
-# test output & cache
 Testing/
 .cache/
+
+# vcpkg and debug information
+vcpkg_installed/
+*.dwo
+
+# Bernstein inception material is maintained in its nested Mercurial repository.
+/inception/
+
+# Bernstein-generated build state.
+/build/
+/out/
+/compile_commands.json
+/CMakeUserPresets.json
+
+# OCaml/Dune and editor state.
+/ocaml/_build/
+/ocaml/_opam/
+/ocaml/.merlin
+*.install
+.DS_Store
+
+# Local tooling state.
+/.direnv/
+.env
+.freebuff/
