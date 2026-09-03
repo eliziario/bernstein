@@ -6,6 +6,9 @@ default:
 setup:
   pre-commit install --install-hooks
 
+inception-check:
+  scripts/check-inception-boundary.sh
+
 configure preset="dev":
   conan install . --lockfile=conan.lock --output-folder build/conan/{{preset}} --build missing -s build_type={{if preset == "ci" { "RelWithDebInfo" } else { "Debug" }}} -s compiler.cppstd=23
   cmake --preset {{preset}} -DCMAKE_TOOLCHAIN_FILE={{invocation_directory()}}/build/conan/{{preset}}/build/{{if preset == "ci" { "RelWithDebInfo" } else { "Debug" }}}/generators/conan_toolchain.cmake

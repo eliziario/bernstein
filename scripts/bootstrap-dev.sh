@@ -40,6 +40,7 @@ opam install --switch="${ocaml_root}" "${ocaml_root}" --deps-only --with-dev-set
 opam install --switch="${ocaml_root}" ocamlformat --yes
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  jj config set --repo snapshot.auto-track '"all() ~ glob:\"inception/**\""'
   pre-commit install --install-hooks
 else
   echo "Git hooks will be installed after the Jujutsu/Git repository is initialized."
