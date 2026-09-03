@@ -16,11 +16,14 @@ configure preset="dev":
 build preset="dev":
   cmake --build --preset {{preset}}
 
+clean preset="dev":
+  cmake --build --preset {{preset}} --target clean
+
 test preset="dev":
   ctest --preset {{preset}}
 
 format:
-  find apps libs tests -type f \( -name '*.cpp' -o -name '*.hpp' \) -exec scripts/run-llvm-tool.sh clang-format -i {} +
+  find apps libs tests -type f \( -name '*.cpp' -o -name '*.h' \) -exec scripts/run-llvm-tool.sh clang-format -i {} +
   find . -type f \( -name CMakeLists.txt -o -name '*.cmake' \) -exec scripts/run-cmake-format.sh -i {} +
   if find ocaml \( -path ocaml/_build -o -path ocaml/_opam \) -prune -o -type f \( -name '*.ml' -o -name '*.mli' \) -print -quit | grep -q .; then find ocaml \( -path ocaml/_build -o -path ocaml/_opam \) -prune -o -type f \( -name '*.ml' -o -name '*.mli' \) -exec opam exec --switch "{{invocation_directory()}}/ocaml" -- ocamlformat --enable-outside-detected-project --inplace {} +; fi
 
@@ -34,5 +37,6 @@ reasoner-build:
 quality preset="dev":
   just configure {{preset}}
   just format
+  just build {{preset}}
   just lint
   just test {{preset}}
