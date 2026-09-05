@@ -1,0 +1,18 @@
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*
+CheckOptions:
+  - key: readability-identifier-length.MinimumVariableNameLength
+    value: '2'
+  - key: readability-identifier-length.MinimumParameterNameLength
+    value: '2'
+WarningsAsErrors: ''
+HeaderFilterRegex: '^(apps|libs)/'
+FormatStyle: file
+UseColor: true

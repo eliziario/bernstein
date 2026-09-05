@@ -1,0 +1,4 @@
+(lang dune 3.24)
+(name bernstein_reasoner)
+(generate_opam_files false)
+(implicit_transitive_deps false)

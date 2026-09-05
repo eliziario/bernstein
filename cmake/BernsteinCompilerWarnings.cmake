@@ -1,0 +1,15 @@
+function(bernstein_target_warnings target)
+  if(MSVC)
+    target_compile_options(${target} INTERFACE /W4 /permissive-)
+    if(BERNSTEIN_WARNINGS_AS_ERRORS)
+      target_compile_options(${target} INTERFACE /WX)
+    endif()
+  else()
+    target_compile_options(
+      ${target} INTERFACE -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wsign-conversion
+    )
+    if(BERNSTEIN_WARNINGS_AS_ERRORS)
+      target_compile_options(${target} INTERFACE -Werror)
+    endif()
+  endif()
+endfunction()

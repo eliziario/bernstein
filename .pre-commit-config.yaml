@@ -1,0 +1,49 @@
+minimum_pre_commit_version: "4.0.0"
+default_install_hook_types: [pre-commit, pre-push]
+exclude: ^(inception/|ocaml/_opam/|ocaml/_build/)
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.1
+    hooks:
+      - id: codespell
+        args: [--write-changes]
+
+  - repo: local
+    hooks:
+      - id: inception-boundary
+        name: inception boundary
+        language: system
+        entry: scripts/check-inception-boundary.sh
+        pass_filenames: false
+
+      - id: clang-format
+        name: clang-format
+        language: system
+        entry: scripts/run-llvm-tool.sh clang-format --dry-run --Werror
+        types_or: [c++, c]
+
+      - id: cmake-format
+        name: cmake-format
+        language: system
+        entry: scripts/run-cmake-format.sh --check
+        files: '(^|/)CMakeLists\.txt$|\.cmake$'
+
+      - id: clang-tidy
+        name: clang-tidy
+        language: system
+        entry: just lint
+        pass_filenames: false
+        stages: [pre-push]
