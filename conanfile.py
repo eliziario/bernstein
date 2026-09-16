@@ -11,6 +11,7 @@ class BernsteinConan(ConanFile):
 
     requires = (
         "cli11/2.4.2",
+        "ftxui/7.0.3",
         "fmt/11.1.3",
         "nlohmann_json/3.11.3",
         "spdlog/1.15.1",
