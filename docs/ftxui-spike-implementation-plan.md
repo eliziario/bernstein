@@ -1,8 +1,10 @@
 # Bernstein TUI Implementation Plan
 
-Status: active implementation plan
+Status: initial implementation checkpoint reached; product development continues
 
 Related design: [Bernstein TUI](ftxui-spike.md)
+
+Results checkpoint: [Bernstein TUI results and decision checkpoint](tui-results.md)
 
 ## Plan revision after Pi/OpenCode analysis
 
