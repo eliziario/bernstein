@@ -1,2 +1,5 @@
 add_subdirectory(bernstein-agent)
-add_subdirectory(bernstein-agent-tui)
+
+if(BERNSTEIN_BUILD_TUI)
+  add_subdirectory(bernstein-agent-tui)
+endif()

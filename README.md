@@ -2,7 +2,7 @@
 
 Bernstein is an architecture-aware coding agent for teams that want humans to retain ownership of design while delegating investigation, implementation, and verification to a capable agent.
 
-The project uses a colocated Jujutsu/Git repository for product code. The [inception/](inception/) documents are intentionally excluded from that repository and maintained as a nested Mercurial repository.
+The project uses a colocated Jujutsu/Git repository for product code. The `inception/` documents are intentionally excluded from that repository and maintained as a nested Mercurial repository.
 
 ## Layout
 

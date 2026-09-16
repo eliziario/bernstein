@@ -1,9 +1,12 @@
 #pragma once
 
 #include <compare>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <variant>
 #include <vector>
 
@@ -95,12 +98,23 @@ enum class EventKind {
     InputPromoted,
     ApprovalRequested,
     OperationCreated,
+    OperationCancelled,
     ExecutionStarted,
     EffectRecorded,
     EffectUnknown,
     OperationSettled,
     OperationReconciled,
 };
+
+[[nodiscard]] std::string_view to_string(InputStatus status);
+[[nodiscard]] std::string_view to_string(OperationStatus status);
+[[nodiscard]] std::string_view to_string(EffectStatus status);
+[[nodiscard]] std::string_view to_string(ProposalStatus status);
+[[nodiscard]] std::string_view to_string(VerificationStatus status);
+[[nodiscard]] std::string_view to_string(EventKind kind);
+
+// Pending and Running operations can still change without reconciliation.
+[[nodiscard]] bool is_active(OperationStatus status);
 
 struct Project {
     ProjectId id;
@@ -136,6 +150,7 @@ struct Candidate {
     CandidateId id;
     ProposalId proposal;
     std::string artifact;
+    VerificationStatus verification = VerificationStatus::Unverified;
 };
 
 struct InputRecord {
@@ -185,6 +200,7 @@ struct DurableEvent {
     DurableEventCursor cursor;
     EventKind kind = EventKind::InputAdmitted;
     std::optional<OperationId> operation;
+    std::optional<ProposalId> proposal;
     std::string detail;
 };
 
@@ -205,6 +221,12 @@ struct LiveObservation {
 using Selection = std::variant<std::monostate, ProjectId, ModuleId, EvidenceId, ProposalId,
                                CandidateId, OperationId>;
 
+// Number of most recent durable events carried by a projection. Full history is read through
+// SessionFacade::replay.
+inline constexpr std::size_t durable_event_tail_size = 32;
+
+// An immutable snapshot for display. A session publishes a new snapshot after each state change
+// and shares it with readers; readers never observe later changes through an existing snapshot.
 struct UiProjection {
     SessionId session;
     std::string workspace_name;
@@ -218,7 +240,10 @@ struct UiProjection {
     std::vector<InputRecord> inputs;
     std::vector<ConversationEntry> history;
     std::vector<OperationRecord> operations;
-    std::vector<DurableEvent> durable_events;
+    // The last durable_event_tail_size events, oldest first.
+    std::vector<DurableEvent> durable_tail;
+    // Cursor of the latest durable event; sequence 0 when no event exists.
+    DurableEventCursor durable_cursor;
     std::vector<LiveObservation> live_observations;
     bool quit_requested = false;
 };
@@ -276,7 +301,9 @@ class SessionFacade {
 
     virtual InputReceipt admit(SubmitInput input) = 0;
     virtual bool promote(InputId input) = 0;
-    [[nodiscard]] virtual UiProjection projection() const = 0;
+    // Returns the snapshot published after the most recent state change. Repeated calls without
+    // an intervening change return the same pointer; the call never copies session state.
+    [[nodiscard]] virtual std::shared_ptr<const UiProjection> projection() const = 0;
     [[nodiscard]] virtual std::vector<DurableEvent> replay(DurableEventCursor after) const = 0;
     virtual void dispatch_control(UserIntent intent) = 0;
 };
@@ -287,10 +314,17 @@ class FakeSession final : public SessionFacade {
 
     InputReceipt admit(SubmitInput input) override;
     bool promote(InputId input) override;
-    [[nodiscard]] UiProjection projection() const override;
+    [[nodiscard]] std::shared_ptr<const UiProjection> projection() const override;
     [[nodiscard]] std::vector<DurableEvent> replay(DurableEventCursor after) const override;
     void dispatch_control(UserIntent intent) override;
+
+    // Advances the oldest active operation by one lifecycle step: promotion, execution start,
+    // then settlement. Operations run serially; a later input waits until earlier ones leave
+    // the active states.
     [[nodiscard]] std::optional<SimulationReceipt> simulate_next();
+
+    // Simulates a timeout after dispatch. Returns false unless the operation is Running.
+    bool simulate_timeout(const OperationId& operation);
 
   public:
     struct State {
@@ -316,7 +350,13 @@ class FakeSession final : public SessionFacade {
     };
 
   private:
+    InputReceipt admit_input(SubmitInput input);
+    bool promote_input(const InputId& input);
+    std::optional<SimulationReceipt> advance_simulation();
+    void publish_projection();
+
     State state_;
+    std::shared_ptr<const UiProjection> projection_;
 };
 
 } // namespace bernstein::core
