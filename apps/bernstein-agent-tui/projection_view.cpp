@@ -5,77 +5,53 @@
 namespace bernstein::tui {
 namespace {
 
-std::string input_status(core::InputStatus status) {
-    switch (status) {
-    case core::InputStatus::Accepted:
-        return "accepted";
-    case core::InputStatus::Promoted:
-        return "promoted";
-    case core::InputStatus::Rejected:
-        return "rejected";
-    case core::InputStatus::Conflict:
-        return "conflict";
-    }
-    return "unknown";
-}
-
-std::string operation_status(core::OperationStatus status) {
-    switch (status) {
-    case core::OperationStatus::Pending:
-        return "pending";
-    case core::OperationStatus::Running:
-        return "running";
-    case core::OperationStatus::Interrupted:
-        return "interrupted";
-    case core::OperationStatus::Unknown:
-        return "unknown";
-    case core::OperationStatus::Settled:
-        return "settled";
-    }
-    return "unknown";
-}
-
-ftxui::Element line(std::string label, std::string value) {
+ftxui::Element render_header(const core::UiProjection& projection) {
     using namespace ftxui;
-    return hbox({text(std::move(label) + ": "), filler(), text(std::move(value))});
+    return hbox({text("●") | color(Color::Green), text(" Bernstein") | bold, filler(),
+                 text(projection.workspace_name + " · " + projection.branch) | dim});
+}
+
+ftxui::Element render_history(const core::UiProjection& projection) {
+    using namespace ftxui;
+
+    Elements entries;
+    for (const auto& entry : projection.history) {
+        entries.push_back(vbox({text("> " + entry.text), text("  model response pending") | dim}));
+    }
+    if (entries.empty()) {
+        entries.push_back(text("No model-visible history yet.") | dim);
+    }
+    return vbox(std::move(entries));
+}
+
+ftxui::Element render_summary(const core::UiProjection& projection) {
+    using namespace ftxui;
+
+    const auto operation_count = std::to_string(projection.operations.size());
+    const auto observation_count = std::to_string(projection.live_observations.size());
+    return text("Session: " + projection.session.value + " · " + operation_count +
+                " operations · " + observation_count + " live observations") |
+           dim;
+}
+
+ftxui::Element render_composer() {
+    using namespace ftxui;
+    return hbox({text("> ") | bold, text("Describe what you want Bernstein to do...") | dim}) |
+           border;
+}
+
+ftxui::Element render_footer() {
+    using namespace ftxui;
+    return hbox({text("Enter send") | dim, filler(), text("? shortcuts") | dim, text("  ") | dim,
+                 text("Ctrl+C quit") | dim});
 }
 
 } // namespace
 
 ftxui::Element render_projection(const core::UiProjection& projection) {
     using namespace ftxui;
-
-    Elements inputs;
-    for (const auto& input : projection.inputs) {
-        inputs.push_back(
-            text(input.id.value + "  " + input_status(input.status) + "  " + input.text));
-    }
-    if (inputs.empty()) {
-        inputs.push_back(text("No inputs admitted."));
-    }
-
-    Elements operations;
-    for (const auto& operation : projection.operations) {
-        operations.push_back(text(operation.id.value + "  " + operation_status(operation.status) +
-                                  "  " + operation.detail));
-    }
-    if (operations.empty()) {
-        operations.push_back(text("No operations."));
-    }
-
-    Elements observations;
-    for (const auto& observation : projection.live_observations) {
-        observations.push_back(text(observation.kind + ": " + observation.detail));
-    }
-    if (observations.empty()) {
-        observations.push_back(text("No live observations."));
-    }
-
-    return vbox({text("Bernstein TUI") | bold, separator(),
-                 line("Workspace", projection.workspace_name), line("Branch", projection.branch),
-                 separator(), text("Inputs") | bold, vbox(std::move(inputs)), separator(),
-                 text("Operations") | bold, vbox(std::move(operations)), separator(),
-                 text("Live observations") | bold, vbox(std::move(observations))}) |
+    return vbox({render_header(projection), separator(), render_history(projection),
+                 render_summary(projection), separator(), render_composer(), render_footer()}) |
            border;
 }
 
