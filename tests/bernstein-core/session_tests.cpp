@@ -113,3 +113,26 @@ TEST_CASE("projection is a value view and cannot mutate session state", "[sessio
     REQUIRE(original.proposals.size() == 1);
     REQUIRE(original.durable_events.empty());
 }
+
+TEST_CASE("simulation advances an operation and returns replay cursors", "[session][simulation]") {
+    FakeSession session;
+    const auto receipt = session.admit(SubmitInput{"Simulate me"});
+    REQUIRE(receipt.operation.has_value());
+
+    const auto started = session.simulate_next();
+    REQUIRE(started.has_value());
+    REQUIRE(started->operation == *receipt.operation);
+    REQUIRE(started->status == OperationStatus::Running);
+    REQUIRE_FALSE(session.replay(DurableEventCursor{0}).empty());
+    REQUIRE(session.replay(started->cursor).empty());
+
+    const auto settled = session.simulate_next();
+    REQUIRE(settled.has_value());
+    REQUIRE(settled->operation == *receipt.operation);
+    REQUIRE(settled->status == OperationStatus::Settled);
+    REQUIRE(settled->cursor.sequence > started->cursor.sequence);
+
+    const auto view = session.projection();
+    REQUIRE(view.operations.front().effect == EffectStatus::Recorded);
+    REQUIRE_FALSE(session.simulate_next().has_value());
+}
