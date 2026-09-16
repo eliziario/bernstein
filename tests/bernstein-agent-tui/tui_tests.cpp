@@ -1,4 +1,5 @@
 #include "bernstein/core/session.hpp"
+#include "headless.hpp"
 #include "input_intent.hpp"
 #include "projection_view.hpp"
 
@@ -42,4 +43,16 @@ TEST_CASE("projection rendering is stable and read-only", "[tui][projection]") {
     REQUIRE(output.find("No model-visible history yet.") != std::string::npos);
     REQUIRE(session.projection().durable_events.empty());
     REQUIRE(session.projection().inputs.empty());
+}
+
+TEST_CASE("headless rendering preserves projection output", "[tui][headless]") {
+    FakeSession session;
+    const auto projection = session.projection();
+    const auto headless = render_headless(projection, "review", 80, 20);
+
+    auto document = render_projection(projection, "review");
+    auto screen = ftxui::Screen::Create(ftxui::Dimension::Fixed(80), ftxui::Dimension::Fixed(20));
+    ftxui::Render(screen, document);
+
+    REQUIRE(headless == screen.ToString());
 }

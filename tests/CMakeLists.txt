@@ -13,6 +13,7 @@ catch_discover_tests(bernstein_core_tests)
 add_executable(
   bernstein_tui_tests
   bernstein-agent-tui/tui_tests.cpp
+  ${CMAKE_SOURCE_DIR}/apps/bernstein-agent-tui/headless.cpp
   ${CMAKE_SOURCE_DIR}/apps/bernstein-agent-tui/input_intent.cpp
   ${CMAKE_SOURCE_DIR}/apps/bernstein-agent-tui/projection_view.cpp
 )

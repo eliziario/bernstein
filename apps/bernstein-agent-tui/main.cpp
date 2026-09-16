@@ -1,17 +1,24 @@
 #include "bernstein/core/session.hpp"
+#include "headless.hpp"
 #include "input_intent.hpp"
 #include "projection_view.hpp"
 
 #include <cstdlib>
 #include <ftxui/component/app.hpp>
 #include <ftxui/component/component.hpp>
-#include <ftxui/dom/elements.hpp>
+#include <iostream>
+#include <string_view>
 #include <utility>
 
-int main() {
+int main(int argc, char** argv) {
     using namespace ftxui;
 
     bernstein::core::FakeSession session;
+    if (argc == 2 && std::string_view(argv[1]) == "--headless") {
+        std::cout << bernstein::tui::render_headless(session.projection());
+        return EXIT_SUCCESS;
+    }
+
     bernstein::tui::ComposerState composer;
     auto app = App::Fullscreen();
     app.ForceHandleCtrlC(false);
