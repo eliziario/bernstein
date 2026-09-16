@@ -95,8 +95,10 @@ enum class EventKind {
     InputPromoted,
     ApprovalRequested,
     OperationCreated,
+    ExecutionStarted,
     EffectRecorded,
     EffectUnknown,
+    OperationSettled,
     OperationReconciled,
 };
 
@@ -184,6 +186,12 @@ struct DurableEvent {
     EventKind kind = EventKind::InputAdmitted;
     std::optional<OperationId> operation;
     std::string detail;
+};
+
+struct SimulationReceipt {
+    OperationId operation;
+    OperationStatus status = OperationStatus::Pending;
+    DurableEventCursor cursor;
 };
 
 struct LiveObservation {
@@ -282,6 +290,7 @@ class FakeSession final : public SessionFacade {
     [[nodiscard]] UiProjection projection() const override;
     [[nodiscard]] std::vector<DurableEvent> replay(DurableEventCursor after) const override;
     void dispatch_control(UserIntent intent) override;
+    [[nodiscard]] std::optional<SimulationReceipt> simulate_next();
 
   public:
     struct State {

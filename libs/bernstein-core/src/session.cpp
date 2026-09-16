@@ -110,6 +110,46 @@ std::vector<DurableEvent> FakeSession::replay(DurableEventCursor after) const {
     return result;
 }
 
+std::optional<SimulationReceipt> FakeSession::simulate_next() {
+    const auto pending =
+        std::find_if(state_.operations.begin(), state_.operations.end(), [](const auto& operation) {
+            return operation.status == OperationStatus::Pending;
+        });
+    if (pending != state_.operations.end()) {
+        const auto attempt_id =
+            make_id<ExecutionAttemptId>("attempt-" + std::to_string(state_.attempts.size() + 1));
+        state_.attempts.push_back(
+            ExecutionAttempt{attempt_id, pending->id, ExecutionAttemptStatus::Running});
+        pending->status = OperationStatus::Running;
+        pending->active_attempt = attempt_id;
+        pending->detail = "Simulated execution started.";
+        append_event(state_, EventKind::ExecutionStarted, pending->id, pending->detail);
+        return SimulationReceipt{pending->id, pending->status, state_.durable_events.back().cursor};
+    }
+
+    const auto running =
+        std::find_if(state_.operations.begin(), state_.operations.end(), [](const auto& operation) {
+            return operation.status == OperationStatus::Running;
+        });
+    if (running != state_.operations.end()) {
+        running->status = OperationStatus::Settled;
+        running->effect = EffectStatus::Recorded;
+        running->detail = "Simulated execution settled.";
+        if (running->active_attempt.has_value()) {
+            const auto attempt = find_by_id(state_.attempts, *running->active_attempt);
+            if (attempt != state_.attempts.end()) {
+                attempt->status = ExecutionAttemptStatus::Settled;
+            }
+        }
+        append_event(state_, EventKind::EffectRecorded, running->id,
+                     "Simulated effect was recorded.");
+        append_event(state_, EventKind::OperationSettled, running->id, running->detail);
+        return SimulationReceipt{running->id, running->status, state_.durable_events.back().cursor};
+    }
+
+    return std::nullopt;
+}
+
 void FakeSession::dispatch_control(UserIntent intent) {
     std::visit(
         [this](const auto& action) {
