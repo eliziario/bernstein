@@ -1,16 +1,18 @@
 # Bernstein TUI
 
-Status: active implementation plan
+Status: FTXUI adopted for the first product TUI (maintainer decision, 2026-09-16)
 
 Owner: Bernstein maintainers
 
 ## Revision after Pi/OpenCode analysis
 
-This implementation plan was revised after reviewing the supplied architectural analyses of Pi and OpenCode in `/Users/marcossantos/code/pi/docs`:
+This design was revised after reviewing supplied architectural analyses of Pi and OpenCode:
 
-- [Pi architecture analysis](/Users/marcossantos/code/pi/docs/architecture-analysis.md)
-- [OpenCode architecture analysis](/Users/marcossantos/code/pi/docs/opencode-architecture-analysis.md)
-- [Pi versus OpenCode comparison](/Users/marcossantos/code/pi/docs/pi-vs-opencode-architecture.md)
+- Pi architecture analysis
+- OpenCode architecture analysis
+- Pi versus OpenCode comparison
+
+These analyses are not published with this repository.
 
 Those documents analyze pinned local snapshots and distinguish observed implementation from architectural inference. They are not evidence that Bernstein should copy either product. They do expose boundaries that the original FTXUI proposal made too coarse.
 
@@ -62,7 +64,7 @@ The spike is intended to answer a bounded engineering question:
 
 > Can Bernstein provide a useful, testable, architecture-aware terminal workflow with FTXUI while keeping project state, authority, effects, verification, and audit outside the UI layer?
 
-This document proposes an experiment. It does not adopt FTXUI as a permanent dependency or approve a final product interaction model.
+This document originally proposed an experiment. Maintainers have since adopted FTXUI for the first product TUI; see [the results and decision record](tui-results.md). The document does not approve a final product interaction model.
 
 ## Context
 
@@ -400,6 +402,3 @@ The decision should include affected modules, consequences, rejected alternative
 - [Notcurses repository](https://github.com/dankamongmen/notcurses)
 - [Notcurses manual](https://notcurses.com/notcurses.3.html)
 - [CPP-Terminal repository](https://github.com/jupyter-xeus/cpp-terminal)
-- [Pi architecture analysis](/Users/marcossantos/code/pi/docs/architecture-analysis.md)
-- [OpenCode architecture analysis](/Users/marcossantos/code/pi/docs/opencode-architecture-analysis.md)
-- [Pi versus OpenCode comparison](/Users/marcossantos/code/pi/docs/pi-vs-opencode-architecture.md)

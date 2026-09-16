@@ -8,11 +8,13 @@ Results checkpoint: [Bernstein TUI results and decision checkpoint](tui-results.
 
 ## Plan revision after Pi/OpenCode analysis
 
-Before implementation, this plan was revised using the supplied analyses of Pi and OpenCode:
+Before implementation, this plan was revised using supplied analyses of Pi and OpenCode:
 
-- [Pi architecture analysis](/Users/marcossantos/code/pi/docs/architecture-analysis.md)
-- [OpenCode architecture analysis](/Users/marcossantos/code/pi/docs/opencode-architecture-analysis.md)
-- [Pi versus OpenCode comparison](/Users/marcossantos/code/pi/docs/pi-vs-opencode-architecture.md)
+- Pi architecture analysis
+- OpenCode architecture analysis
+- Pi versus OpenCode comparison
+
+These analyses are not published with this repository.
 
 The original plan's `AgentSession::snapshot()` abstraction was too coarse for the lifecycle boundaries Bernstein cares about. The spike must now distinguish:
 
@@ -104,7 +106,7 @@ tests/
 docs/
   ftxui-spike.md
   ftxui-spike-implementation-plan.md
-  ftxui-spike-results.md         # created when the evaluation is complete
+  tui-results.md                 # results and decision record
 ```
 
 The exact split may change after the first compile. The invariant is that core headers contain no FTXUI types, terminal handles, component objects, or rendering concerns.
@@ -320,7 +322,7 @@ This is an environment sample, not complete portability verification.
 
 ## Phase 6 — Capture results and make the decision
 
-Create `docs/ftxui-spike-results.md` containing:
+Create `docs/tui-results.md` containing:
 
 - exact repository snapshot and Jujutsu change id;
 - exact FTXUI revision and dependency integration;

@@ -11,6 +11,7 @@ include(CTest)
 
 option(BERNSTEIN_ENABLE_CLANG_TIDY "Run clang-tidy during CMake builds" OFF)
 option(BERNSTEIN_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+option(BERNSTEIN_BUILD_TUI "Build the FTXUI terminal user interface" ON)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
