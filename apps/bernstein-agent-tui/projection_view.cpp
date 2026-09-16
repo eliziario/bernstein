@@ -34,10 +34,12 @@ ftxui::Element render_summary(const core::UiProjection& projection) {
            dim;
 }
 
-ftxui::Element render_composer() {
+ftxui::Element render_composer(std::string_view draft) {
     using namespace ftxui;
-    return hbox({text("> ") | bold, text("Describe what you want Bernstein to do...") | dim}) |
-           border;
+    const auto content =
+        draft.empty() ? "Describe what you want Bernstein to do..." : std::string(draft);
+    const auto content_element = draft.empty() ? text(content) | dim : text(content);
+    return hbox({text("> ") | bold, content_element}) | border;
 }
 
 ftxui::Element render_footer() {
@@ -48,11 +50,12 @@ ftxui::Element render_footer() {
 
 } // namespace
 
-ftxui::Element render_projection(const core::UiProjection& projection) {
+ftxui::Element render_projection(const core::UiProjection& projection, std::string_view draft) {
     using namespace ftxui;
-    return vbox({render_header(projection), separator(), render_history(projection),
-                 render_summary(projection), separator(), render_composer(), render_footer()}) |
-           border;
+    return vbox({render_header(projection), separator(), render_history(projection) | flex,
+                 render_summary(projection), separator(), render_composer(draft),
+                 render_footer()}) |
+           border | flex;
 }
 
 } // namespace bernstein::tui
