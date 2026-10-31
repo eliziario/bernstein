@@ -51,10 +51,10 @@ std::string render_plain(const core::UiProjection& projection, std::string_view 
     return output;
 }
 
-std::string run_headless(core::FakeSession& session, std::istream& input, ViewSize size) {
+std::string run_headless(core::FakeSession& session, std::istream& stream, ViewSize size) {
     input::ComposerState composer;
     std::string line;
-    while (std::getline(input, line)) {
+    while (std::getline(stream, line)) {
         for (const auto& point : input::split_code_points(line)) {
             dispatch(session, composer, input::KeyEvent::character(point));
         }

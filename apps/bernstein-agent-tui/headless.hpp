@@ -15,7 +15,7 @@ namespace bernstein::tui {
 
 // Feeds each input line through the same event translation as the terminal composer, dispatches
 // the resulting intents, runs the simulation until no operation is active, and renders plain text.
-[[nodiscard]] std::string run_headless(core::FakeSession& session, std::istream& input,
+[[nodiscard]] std::string run_headless(core::FakeSession& session, std::istream& stream,
                                        ViewSize size = {});
 
 } // namespace bernstein::tui
