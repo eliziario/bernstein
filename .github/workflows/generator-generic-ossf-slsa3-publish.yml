@@ -1,66 +1,113 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-# This workflow lets you generate SLSA provenance file for your project.
-# The generation satisfies level 3 for the provenance requirements - see https://slsa.dev/spec/v0.1/requirements
-# The project is an initiative of the OpenSSF (openssf.org) and is developed at
-# https://github.com/slsa-framework/slsa-github-generator.
-# The provenance file can be verified using https://github.com/slsa-framework/slsa-verifier.
-# For more information about SLSA and how it improves the supply-chain, visit slsa.dev.
+# Builds the Bernstein release artifact and generates SLSA build provenance for it.
+#
+# The provenance generator is a third-party reusable workflow provided by the OpenSSF
+# slsa-framework project, governed by its own terms of service and support documentation:
+# https://github.com/slsa-framework/slsa-github-generator
+# Generated provenance can be checked with https://github.com/slsa-framework/slsa-verifier
+#
+# The build mirrors the project-owned `ci` preset, so the artifact is produced by the same
+# configuration the project tests with, rather than by commands written only for this workflow.
 
 name: SLSA generic generator
+
 on:
   workflow_dispatch:
   release:
     types: [created]
 
+permissions: {}
+
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     outputs:
       digests: ${{ steps.hash.outputs.digests }}
-
     steps:
       - uses: actions/checkout@v4
 
-      # ========================================================
-      #
-      # Step 1: Build your artifacts.
-      #
-      # ========================================================
-      - name: Build artifacts
-        run: |
-            # These are some amazing artifacts.
-            echo "artifact1" > artifact1
-            echo "artifact2" > artifact2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      # ========================================================
-      #
-      # Step 2: Add a step to generate the provenance subjects
-      #         as shown below. Update the sha256 sum arguments
-      #         to include all binaries that you generate
-      #         provenance for.
-      #
-      # ========================================================
+      - name: Install build tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ninja-build clang-tidy
+          python -m pip install --upgrade pip
+          pip install "conan>=2,<3"
+
+      - name: Resolve pinned dependencies
+        run: |
+          set -euo pipefail
+          conan profile detect --force
+          conan install . \
+            --lockfile=conan.lock \
+            --output-folder build/conan/ci \
+            --build missing \
+            -s build_type=RelWithDebInfo \
+            -s compiler.cppstd=23
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          cmake --preset ci \
+            -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/build/conan/ci/build/RelWithDebInfo/generators/conan_toolchain.cmake"
+
+      - name: Build
+        run: cmake --build --preset ci
+
+      - name: Test
+        run: ctest --preset ci
+
+      - name: Package the release artifact
+        id: package
+        run: |
+          set -euo pipefail
+
+          # Releases are named after the tag; a manual run is named after the commit.
+          if [ "${GITHUB_EVENT_NAME}" = "release" ]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="$(git rev-parse --short HEAD)"
+          fi
+          name="bernstein-${version}-linux-x86_64"
+
+          staging="$(mktemp -d)/${name}"
+          mkdir -p "${staging}"
+          cp build/ci/apps/bernstein-agent/bernstein-agent "${staging}/"
+          cp build/ci/apps/bernstein-agent-tui/bernstein-agent-tui "${staging}/"
+          cp LICENSE README.md "${staging}/"
+
+          mkdir -p dist
+          tar -czf "dist/${name}.tar.gz" -C "$(dirname "${staging}")" "${name}"
+          echo "artifact=${name}.tar.gz" >> "${GITHUB_OUTPUT}"
+
       - name: Generate subject for provenance
         id: hash
         run: |
           set -euo pipefail
+          cd dist
+          # No leading "./" in the glob: the subject name must match the released asset name.
+          # The output name must match the job output read by the provenance job.
+          echo "digests=$(sha256sum -- *.tar.gz | base64 -w0)" >> "${GITHUB_OUTPUT}"
 
-          # List the artifacts the provenance will refer to.
-          files=$(ls artifact*)
-          # Generate the subjects (base64 encoded).
-          echo "hashes=$(sha256sum $files | base64 -w0)" >> "${GITHUB_OUTPUT}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.artifact }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
 
   provenance:
     needs: [build]
     permissions:
-      actions: read   # To read the workflow path.
+      actions: read # To read the workflow path.
       id-token: write # To sign the provenance.
       contents: write # To add assets to a release.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
     with:
-      base64-subjects: "${{ needs.build.outputs.digests }}"
-      upload-assets: true # Optional: Upload to a new release
+      base64-subjects: ${{ needs.build.outputs.digests }}
+      # A manual run has no release to attach assets to.
+      upload-assets: ${{ github.event_name == 'release' }}
