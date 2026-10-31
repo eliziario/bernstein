@@ -1,0 +1,158 @@
+# Builds and tests every push to main and every pull request.
+#
+# The build uses the project-owned `ci` preset so that continuous integration and a local
+# `just configure ci` resolve the same configuration from the same pinned lockfile.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ninja-build clang-tidy
+          python -m pip install --upgrade pip
+          pip install "conan>=2,<3"
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ runner.os }}-${{ hashFiles('conan.lock') }}
+          restore-keys: conan-${{ runner.os }}-
+
+      - name: Resolve pinned dependencies
+        run: |
+          set -euo pipefail
+          conan profile detect --force
+          conan install . \
+            --lockfile=conan.lock \
+            --output-folder build/conan/ci \
+            --build missing \
+            -s build_type=RelWithDebInfo \
+            -s compiler.cppstd=23
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          cmake --preset ci \
+            -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/build/conan/ci/build/RelWithDebInfo/generators/conan_toolchain.cmake"
+
+      - name: Build
+        run: cmake --build --preset ci
+
+      - name: Test
+        run: ctest --preset ci
+
+      - name: Check the headless interface runs
+        run: |
+          set -euo pipefail
+          output="$(printf 'first request\n' | build/ci/apps/bernstein-agent-tui/bernstein-agent-tui --headless)"
+          echo "${output}"
+          # The headless snapshot must be plain text that reflects the lifecycle.
+          grep -q "first request" <<<"${output}"
+          grep -q "operation settled" <<<"${output}"
+          if printf '%s' "${output}" | grep -q $'\x1b'; then
+            echo "headless output contains escape sequences" >&2
+            exit 1
+          fi
+
+  build-without-tui:
+    name: Build without the terminal interface
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ninja-build
+          python -m pip install --upgrade pip
+          pip install "conan>=2,<3"
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.conan2
+          key: conan-${{ runner.os }}-${{ hashFiles('conan.lock') }}
+          restore-keys: conan-${{ runner.os }}-
+
+      - name: Resolve pinned dependencies
+        run: |
+          set -euo pipefail
+          conan profile detect --force
+          conan install . \
+            --lockfile=conan.lock \
+            --output-folder build/conan/notui \
+            --build missing \
+            -s build_type=Debug \
+            -s compiler.cppstd=23
+
+      - name: Configure, build, and test without the interface
+        run: |
+          set -euo pipefail
+          cmake -S . -B build/notui -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_STANDARD=23 \
+            -DBERNSTEIN_BUILD_TUI=OFF \
+            -DBERNSTEIN_WARNINGS_AS_ERRORS=ON \
+            -DCMAKE_TOOLCHAIN_FILE="${GITHUB_WORKSPACE}/build/conan/notui/build/Debug/generators/conan_toolchain.cmake"
+          cmake --build build/notui
+          ctest --test-dir build/notui --output-on-failure
+
+      - name: Assert the core does not depend on the interface library
+        run: |
+          set -euo pipefail
+          # The dependency must be absent from the generated build, not merely unused.
+          if grep -qi ftxui build/notui/build.ninja; then
+            echo "ftxui is referenced in a build configured with BERNSTEIN_BUILD_TUI=OFF" >&2
+            exit 1
+          fi
+
+  checks:
+    name: Repository checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The formatting and clang-tidy hooks depend on locally installed LLVM, whose version
+      # differs between a developer machine and this runner, so they stay a pre-commit and
+      # pre-push concern. The hooks run here are version-pinned by pre-commit itself.
+      - name: Run the portable pre-commit hooks
+        env:
+          SKIP: clang-format,cmake-format,clang-tidy
+        run: |
+          set -euo pipefail
+          pip install pre-commit
+          pre-commit run --all-files --show-diff-on-failure
