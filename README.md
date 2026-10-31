@@ -144,4 +144,4 @@ The roadmap is the current plan, and the open questions in it are genuinely open
 
 ## License
 
-BSD 3-Clause. See [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).
