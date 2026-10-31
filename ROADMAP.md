@@ -13,7 +13,7 @@ The milestones are ordered by dependency rather than by date, and no dates appea
 | Projection contract | Working: immutable shared snapshots, one per change, with a bounded event tail and a replay cursor. |
 | Terminal interface | Working: renders lifecycle state, turns keys into typed intents, performs no effects. |
 | Headless mode | Working: the same translation and renderer, printing plain text. |
-| Tests | Twenty-three, over the model, the snapshot contract, key translation, rendering, and the headless path. |
+| Tests | Twenty-five: fifteen over the session model, five over key events and intent translation, five over rendering, the headless path, and the terminal adapter. |
 | Deterministic session | In memory only. It is the reference for what the lifecycle means, not a feature. |
 | Persistence | Nothing. |
 | Model provider | Nothing. |
@@ -30,7 +30,7 @@ People own the goals, the architectural decisions, and the invariants. The agent
 
 ## Gaps we are carrying
 
-Six of these are recorded in [docs/tui-results.md](docs/tui-results.md); the seventh concerns the pipeline and is noted here. Each is answered by the milestone in brackets.
+Of the eight entries below, seven are recorded in [docs/tui-results.md](docs/tui-results.md), where the evidence behind each one sits. The eighth concerns continuous integration and has since been closed; it stays here because earlier versions of this document listed it as outstanding. Each gap that remains open names the milestone that answers it.
 
 Replay is a read-only query today, and nothing rebuilds a projection from durable events, which means no test can yet demonstrate the property we care about — that replaying history does not re-run its effects. [M2]
 
