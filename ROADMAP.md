@@ -55,7 +55,7 @@ Corrections, not new subsystems. They come first because each one is small and e
 - [ ] Fix `bernstein_target_warnings` so a target's own sources are compiled with the warnings, and demonstrate the fix by introducing a deliberate warning in a library source and watching the build fail.
 - [x] Run the terminal scenarios and record the environment. Done on 2026-10-31 through a `pty` harness and under GNU `screen`; the remaining emulator and legibility checks are noted in [docs/tui-manual-scenarios.md](docs/tui-manual-scenarios.md).
 - [x] Pull the terminal library back behind the renderer, so that turning a keystroke into an intent no longer depends on it. The input library and its tests now link no FTXUI, which the no-interface build checks.
-- [ ] Rename the terminal-interface documents, which still read as a spike although the technology question was settled.
+- [x] Rewrite the terminal-interface documents, which still read as a spike although the technology question was settled. They are now [docs/terminal-interface.md](docs/terminal-interface.md), describing the interface as it is, and [docs/terminal-interface-plan.md](docs/terminal-interface-plan.md), kept as a record of the plan and the two things it got wrong.
 - [ ] Decide whether `apps/bernstein-sdlc` and `libs/bernstein-protocol` remain as placeholders or are removed until something needs them. An empty directory that has sat untouched for a while is a statement of intent nobody has reviewed.
 
 Done when the warning fix has a demonstrated failure case and no claim in the documents rests on evidence that was never gathered.

@@ -6,7 +6,7 @@ Status: FTXUI adopted; the TUI is the current product priority
 
 Decision owner: Bernstein maintainers. Recorded: 2026-09-16.
 
-FTXUI is Bernstein's TUI technology. Development continues against the projection/intent architecture described in [the TUI design](ftxui-spike.md). The ncursesw, CPP-Terminal, and Notcurses alternatives are not being pursued for the first product TUI.
+FTXUI is Bernstein's TUI technology. Development continues against the projection/intent architecture described in [the terminal interface document](terminal-interface.md). The ncursesw, CPP-Terminal, and Notcurses alternatives are not being pursued for the first product TUI.
 
 The decision covers the terminal library and the boundary between the TUI and the session. It does not approve a final visual design, and it does not claim terminal portability beyond the environments recorded below.
 
@@ -92,6 +92,6 @@ Environment: macOS 15.6.1 arm64, Apple clang 16.0.0, CMake 4.4.3, Conan 2.32.0, 
 
 ## Related artifacts
 
-- [Bernstein TUI design](ftxui-spike.md)
-- [Bernstein TUI implementation plan](ftxui-spike-implementation-plan.md)
+- [The terminal interface](terminal-interface.md)
+- [The plan it was built from](terminal-interface-plan.md)
 - [Manual terminal scenarios](tui-manual-scenarios.md)
