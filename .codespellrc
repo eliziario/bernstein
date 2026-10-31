@@ -1,0 +1,3 @@
+[codespell]
+# "caf" is the UTF-8 string "café" with its last code point removed, in a test.
+ignore-words-list = caf
