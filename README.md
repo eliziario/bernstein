@@ -121,7 +121,7 @@ tests/                     Catch2 tests for the model and the interface.
 ## Documents
 
 - [RFC 0001](docs/rfc-0001-core-interfaces.md) is the one to read first. It describes the boundary between proposing an action and taking one, which is the reason the rest of the code is shaped as it is. Almost none of it is built yet, and it says so.
-- [Terminal interface design](docs/ftxui-spike.md) and the [implementation plan](docs/ftxui-spike-implementation-plan.md).
+- [The terminal interface](docs/terminal-interface.md): the boundary it enforces, the rules its rendering obeys, and the measured limit on scrolling. The [plan it was built from](docs/terminal-interface-plan.md) is kept as a record.
 - [Results and decision record](docs/tui-results.md), which carries the evidence behind the claims above along with its own limits.
 - [Manual terminal scenarios](docs/tui-manual-scenarios.md), for the behaviour a test cannot establish.
 - [ROADMAP.md](ROADMAP.md).
