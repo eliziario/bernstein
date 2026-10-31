@@ -1,7 +1,8 @@
 #include "bernstein/core/session.hpp"
+#include "bernstein/input/key_event.hpp"
 #include "headless.hpp"
-#include "input_intent.hpp"
 #include "projection_view.hpp"
+#include "terminal_keys.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <ftxui/component/event.hpp>
@@ -20,86 +21,6 @@ bool contains(const std::string& haystack, const std::string& needle) {
 }
 
 } // namespace
-
-TEST_CASE("composer events translate deterministically", "[tui][intent]") {
-    const std::vector<OperationRecord> operations;
-    const auto typed =
-        translate_event(ftxui::Event::Character("hello"), ComposerState{}, operations);
-    REQUIRE(typed.handled);
-    REQUIRE(typed.composer.draft == "hello");
-    REQUIRE_FALSE(typed.intent.has_value());
-
-    const auto submitted = translate_event(ftxui::Event::Return, typed.composer, operations);
-    REQUIRE(submitted.handled);
-    REQUIRE(submitted.composer.draft.empty());
-    REQUIRE(submitted.intent.has_value());
-    REQUIRE(std::get<SubmitInput>(*submitted.intent).text == "hello");
-
-    const auto quit = translate_event(ftxui::Event::CtrlC, ComposerState{}, operations);
-    REQUIRE(quit.handled);
-    REQUIRE(std::holds_alternative<Quit>(*quit.intent));
-}
-
-TEST_CASE("composer editing never produces an intent", "[tui][intent]") {
-    const std::vector<OperationRecord> operations;
-
-    const auto empty_submit = translate_event(ftxui::Event::Return, ComposerState{}, operations);
-    REQUIRE(empty_submit.handled);
-    REQUIRE_FALSE(empty_submit.intent.has_value());
-
-    for (const auto& clear : {ftxui::Event::Escape, ftxui::Event::CtrlU}) {
-        const auto cleared = translate_event(clear, ComposerState{"draft"}, operations);
-        REQUIRE(cleared.handled);
-        REQUIRE(cleared.composer.draft.empty());
-        REQUIRE_FALSE(cleared.intent.has_value());
-    }
-
-    const auto ascii = translate_event(ftxui::Event::Backspace, ComposerState{"ab"}, operations);
-    REQUIRE(ascii.composer.draft == "a");
-    REQUIRE_FALSE(ascii.intent.has_value());
-
-    const auto empty = translate_event(ftxui::Event::Backspace, ComposerState{}, operations);
-    REQUIRE(empty.handled);
-    REQUIRE(empty.composer.draft.empty());
-
-    const auto unhandled = translate_event(ftxui::Event::F5, ComposerState{"keep"}, operations);
-    REQUIRE_FALSE(unhandled.handled);
-    REQUIRE(unhandled.composer.draft == "keep");
-}
-
-TEST_CASE("backspace removes a whole UTF-8 code point", "[tui][intent]") {
-    const std::vector<OperationRecord> operations;
-    const auto accented =
-        translate_event(ftxui::Event::Backspace, ComposerState{"caf\xC3\xA9"}, operations);
-    REQUIRE(accented.composer.draft == "caf");
-
-    const auto emoji =
-        translate_event(ftxui::Event::Backspace, ComposerState{"a\xF0\x9F\x99\x82"}, operations);
-    REQUIRE(emoji.composer.draft == "a");
-}
-
-TEST_CASE("cancel and reconcile keys target the lifecycle state", "[tui][intent]") {
-    FakeSession session;
-    REQUIRE_FALSE(
-        translate_event(ftxui::Event::CtrlX, ComposerState{}, session.projection()->operations)
-            .intent.has_value());
-
-    const auto receipt = session.admit(SubmitInput{"work"});
-    const auto cancel =
-        translate_event(ftxui::Event::CtrlX, ComposerState{}, session.projection()->operations);
-    REQUIRE(std::get<CancelOperation>(*cancel.intent).id == *receipt.operation);
-
-    REQUIRE_FALSE(
-        translate_event(ftxui::Event::CtrlR, ComposerState{}, session.projection()->operations)
-            .intent.has_value());
-
-    REQUIRE(session.simulate_next().has_value());
-    REQUIRE(session.simulate_next().has_value());
-    session.dispatch_control(std::get<CancelOperation>(*cancel.intent));
-    const auto reconcile =
-        translate_event(ftxui::Event::CtrlR, ComposerState{}, session.projection()->operations);
-    REQUIRE(std::get<ReconcileOperation>(*reconcile.intent).id == *receipt.operation);
-}
 
 TEST_CASE("rendering shows input and operation lifecycle state", "[tui][projection]") {
     FakeSession session;
@@ -157,4 +78,21 @@ TEST_CASE("headless mode drives the session through composer events", "[tui][hea
     REQUIRE(contains(output, "second request"));
     REQUIRE(contains(output, "operation settled"));
     REQUIRE_FALSE(contains(output, "\x1b"));
+}
+
+TEST_CASE("terminal events map onto Bernstein keys", "[tui][keys]") {
+    using bernstein::input::Key;
+
+    REQUIRE(from_terminal(ftxui::Event::CtrlC).key == Key::Quit);
+    REQUIRE(from_terminal(ftxui::Event::Return).key == Key::Submit);
+    REQUIRE(from_terminal(ftxui::Event::Escape).key == Key::ClearDraft);
+    REQUIRE(from_terminal(ftxui::Event::CtrlU).key == Key::ClearDraft);
+    REQUIRE(from_terminal(ftxui::Event::Backspace).key == Key::DeleteBefore);
+    REQUIRE(from_terminal(ftxui::Event::CtrlX).key == Key::CancelOperation);
+    REQUIRE(from_terminal(ftxui::Event::CtrlR).key == Key::ReconcileOperation);
+    REQUIRE(from_terminal(ftxui::Event::F5).key == Key::Unknown);
+
+    const auto typed = from_terminal(ftxui::Event::Character("\xC3\xA9"));
+    REQUIRE(typed.key == Key::Character);
+    REQUIRE(typed.text == "\xC3\xA9");
 }

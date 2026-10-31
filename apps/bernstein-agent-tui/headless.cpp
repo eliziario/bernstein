@@ -1,8 +1,8 @@
 #include "headless.hpp"
 
-#include "input_intent.hpp"
+#include "bernstein/input/intent.hpp"
+#include "bernstein/input/key_event.hpp"
 
-#include <ftxui/component/event.hpp>
 #include <ftxui/dom/node.hpp>
 #include <ftxui/screen/screen.hpp>
 #include <ftxui/screen/string.hpp>
@@ -10,9 +10,10 @@
 namespace bernstein::tui {
 namespace {
 
-void dispatch(core::FakeSession& session, ComposerState& composer, const ftxui::Event& event) {
+void dispatch(core::FakeSession& session, input::ComposerState& composer,
+              const input::KeyEvent& event) {
     const auto snapshot = session.projection();
-    auto translation = translate_event(event, std::move(composer), snapshot->operations);
+    auto translation = input::translate_event(event, std::move(composer), snapshot->operations);
     composer = std::move(translation.composer);
     if (translation.intent.has_value() &&
         !std::holds_alternative<core::Quit>(*translation.intent)) {
@@ -51,15 +52,13 @@ std::string render_plain(const core::UiProjection& projection, std::string_view 
 }
 
 std::string run_headless(core::FakeSession& session, std::istream& input, ViewSize size) {
-    ComposerState composer;
+    input::ComposerState composer;
     std::string line;
     while (std::getline(input, line)) {
-        for (const auto& glyph : ftxui::Utf8ToGlyphs(line)) {
-            if (!glyph.empty()) {
-                dispatch(session, composer, ftxui::Event::Character(glyph));
-            }
+        for (const auto& point : input::split_code_points(line)) {
+            dispatch(session, composer, input::KeyEvent::character(point));
         }
-        dispatch(session, composer, ftxui::Event::Return);
+        dispatch(session, composer, input::KeyEvent::of(input::Key::Submit));
         while (session.simulate_next().has_value()) {
         }
     }

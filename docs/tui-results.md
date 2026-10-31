@@ -28,7 +28,8 @@ flowchart LR
 Targets:
 
 - `bernstein::core`: lifecycle records, `SessionFacade`, `FakeSession`, and status labels. It has no FTXUI dependency.
-- `bernstein::tui`: event translation, projection rendering, and the headless driver. Both the executable and the tests link this library.
+- `bernstein::input`: the key event type and the translation from a keystroke to a typed intent. It links no terminal library, and its tests link none either.
+- `bernstein::tui`: projection rendering, the headless driver, and the adapter that maps an FTXUI event onto a Bernstein key event.
 - `bernstein-agent-tui`: the fullscreen executable and the `--headless` mode.
 - `BERNSTEIN_BUILD_TUI` (default `ON`): set it to `OFF` to build core and the existing agent without FTXUI.
 
@@ -37,7 +38,7 @@ Targets:
 - `SessionFacade::projection()` returns `std::shared_ptr<const UiProjection>`. The session publishes a new snapshot once after each state change, and `projection()` returns the stored pointer without copying session state. Without an intervening change, it returns the same pointer.
 - A snapshot holds only the last `durable_event_tail_size` (32) durable events, plus the latest `DurableEventCursor`. The full history is available only through `replay(cursor)`.
 - The fullscreen loop takes one snapshot per frame, in the renderer. The next event is translated against that same pointer, so keys act on the state that was displayed.
-- `translate_event` receives only the snapshot's operations.
+- `translate_event` takes a `bernstein::input::KeyEvent` and the snapshot's operations, and nothing else. FTXUI now appears only in the renderer, the application loop, and a single adapter function, so the lifecycle and the intent path are terminal-independent in a checkable sense rather than by assertion: `bernstein_input_tests` links no FTXUI, `libbernstein_input.a` references no FTXUI symbol, and a build configured with `BERNSTEIN_BUILD_TUI=OFF` contains no reference to the library anywhere.
 
 ## Current behavior
 
@@ -60,7 +61,7 @@ Environment: macOS 15.6.1 arm64, Apple clang 16.0.0, CMake 4.4.3, Conan 2.32.0, 
 | Area | Evidence | Result | Boundary |
 | --- | --- | --- | --- |
 | Build | `cmake --build --preset dev` | Passed | This environment only |
-| Automated suite | `ctest --preset dev --output-on-failure` | 23/23 passed | In-memory fake session |
+| Automated suite | `ctest --preset dev --output-on-failure` | 25/25 passed | In-memory fake session |
 | Lifecycle transitions | Catch2 session tests | Passed | Fake state; no persistence |
 | Snapshot contract | Pointer identity across unchanged and changed state; bounded tail versus full replay | Passed | Fake session only |
 | Key translation | Catch2 TUI tests | Passed | Synthetic FTXUI events |
@@ -68,7 +69,9 @@ Environment: macOS 15.6.1 arm64, Apple clang 16.0.0, CMake 4.4.3, Conan 2.32.0, 
 | Headless parity | Headless run through composer events | Passed | Same process; no terminal |
 | Test sensitivity | Reverted the UTF-8 backspace, pending-cancel, and scroll fixes; published a snapshot on a simulation step with no change; removed the tail bound. One change at a time | Each change broke its test | Five changes only |
 | Fullscreen loop | Scripted pseudo-terminal run (90x26): typing, backspace, submit, simulated progress, Ctrl+X, Ctrl+C | Expected states appeared; exit status 0; alternate screen entered and left | One scripted run; no visual inspection |
-| Resize, narrow terminals, other emulators | [Manual scenarios](tui-manual-scenarios.md) | Not yet executed | Human run required |
+| Terminal scenarios | [Manual scenarios](tui-manual-scenarios.md), 39 checks through a `pty` harness with real `SIGWINCH` resizes | All passed | A `pty` is not an emulator; legibility and other emulators remain unjudged |
+| Multiplexer | GNU `screen`, `TERM=screen` | Regions rendered, composer accepted input, lifecycle reached settled | One multiplexer, one terminal type |
+| Diff view cost | Off-screen render of a synthetic diff at 200x50 | 1.1 ms per frame at 1,000 lines; 5.8 ms at 5,000; 25.6 ms at 20,000; 137 ms at 100,000 | One machine, one viewport, synthetic content |
 
 ## Known gaps
 
@@ -77,7 +80,8 @@ Environment: macOS 15.6.1 arm64, Apple clang 16.0.0, CMake 4.4.3, Conan 2.32.0, 
 - **Navigation and approval:** the TUI has no keys or views for selection, inspection, approval, or diffs.
 - **Simulated timeouts:** `simulate_timeout` is exercised only by tests. No key triggers it.
 - **Warning flags:** `bernstein_target_warnings` attaches flags as `INTERFACE`. The library's own sources get no warning flags, and only the targets that link it do.
-- **Manual scenarios:** they have not yet been run in a human-operated terminal.
+- **Scrolling does not scale, and we now know where.** The conversation region builds an element for every entry and wraps the result in `frame` with `focusPositionRelative`, which is FTXUI's idiomatic way to scroll and costs a full tree rebuild per frame. Measured on a synthetic diff at a 200x50 viewport: 1.1 ms per frame at 1,000 lines, 5.8 ms at 5,000, 25.6 ms at 20,000, and 137 ms at 100,000. Rendering only the visible window instead holds flat at about 0.15 ms regardless of size. Nothing needs changing while the conversation holds a handful of entries, and a diff view must not use this pattern. The peak-memory figures from that run bound the full-tree case only, since the measurement reports a whole-process high-water mark and the windowed case ran after it.
+- **Legibility is still unjudged.** The scenarios were run through a `pty` harness, which confirms the text is present and cannot say whether a person can read it, nor how any real emulator renders it.
 
 ## Next review questions
 

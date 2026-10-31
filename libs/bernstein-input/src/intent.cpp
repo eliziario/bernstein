@@ -1,25 +1,9 @@
-#include "input_intent.hpp"
+#include "bernstein/input/intent.hpp"
 
 #include <algorithm>
 #include <utility>
 
-namespace bernstein::tui {
-namespace {
-
-bool is_utf8_continuation(char byte) {
-    return (static_cast<unsigned char>(byte) & 0xC0U) == 0x80U;
-}
-
-void erase_last_code_point(std::string& text) {
-    while (!text.empty() && is_utf8_continuation(text.back())) {
-        text.pop_back();
-    }
-    if (!text.empty()) {
-        text.pop_back();
-    }
-}
-
-} // namespace
+namespace bernstein::input {
 
 std::optional<core::OperationId>
 cancellation_target(const std::vector<core::OperationRecord>& operations) {
@@ -44,13 +28,13 @@ reconciliation_target(const std::vector<core::OperationRecord>& operations) {
     return operation->id;
 }
 
-EventTranslation translate_event(const ftxui::Event& event, ComposerState state,
+EventTranslation translate_event(const KeyEvent& event, ComposerState state,
                                  const std::vector<core::OperationRecord>& operations) {
-    if (event == ftxui::Event::CtrlC) {
+    switch (event.key) {
+    case Key::Quit:
         return {std::move(state), core::Quit{}, true};
-    }
 
-    if (event == ftxui::Event::Return) {
+    case Key::Submit: {
         if (state.draft.empty()) {
             return {std::move(state), std::nullopt, true};
         }
@@ -59,17 +43,15 @@ EventTranslation translate_event(const ftxui::Event& event, ComposerState state,
         return {std::move(state), core::SubmitInput{std::move(text)}, true};
     }
 
-    if (event == ftxui::Event::Escape || event == ftxui::Event::CtrlU) {
+    case Key::ClearDraft:
         state.draft.clear();
         return {std::move(state), std::nullopt, true};
-    }
 
-    if (event == ftxui::Event::Backspace) {
+    case Key::DeleteBefore:
         erase_last_code_point(state.draft);
         return {std::move(state), std::nullopt, true};
-    }
 
-    if (event == ftxui::Event::CtrlX) {
+    case Key::CancelOperation: {
         auto target = cancellation_target(operations);
         if (!target.has_value()) {
             return {std::move(state), std::nullopt, true};
@@ -77,7 +59,7 @@ EventTranslation translate_event(const ftxui::Event& event, ComposerState state,
         return {std::move(state), core::CancelOperation{std::move(*target)}, true};
     }
 
-    if (event == ftxui::Event::CtrlR) {
+    case Key::ReconcileOperation: {
         auto target = reconciliation_target(operations);
         if (!target.has_value()) {
             return {std::move(state), std::nullopt, true};
@@ -85,12 +67,14 @@ EventTranslation translate_event(const ftxui::Event& event, ComposerState state,
         return {std::move(state), core::ReconcileOperation{std::move(*target)}, true};
     }
 
-    if (event.is_character()) {
-        state.draft += event.character();
+    case Key::Character:
+        state.draft += event.text;
         return {std::move(state), std::nullopt, true};
-    }
 
+    case Key::Unknown:
+        break;
+    }
     return {std::move(state), std::nullopt, false};
 }
 
-} // namespace bernstein::tui
+} // namespace bernstein::input

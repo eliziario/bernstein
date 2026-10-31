@@ -1,65 +1,54 @@
 # Bernstein
 
-Bernstein is an architecture-aware coding agent for teams that want people to keep ownership of product direction and system design while delegating bounded investigation, implementation, and verification.
+Bernstein is a coding agent built on the assumption that the interesting unit of work is not a diff. It is a decision, the parts of the design that decision touches, the implementation that follows from it, the evidence that the implementation does what was intended, and whatever uncertainty is left over. Those five things tend to arrive in a chat transcript flattened into one undifferentiated stream, where a plausible suggestion and a verified result look alike. Keeping them apart is the whole point of the project.
 
-The idea it is built around: the useful unit of collaboration is not a diff. It is a decision, the design objects it affects, the implementation, the evidence that it works, and the uncertainty that remains. Bernstein is meant to keep those things distinct instead of collapsing them into a chat transcript where a plausible suggestion and a verified result look the same.
+It is early. The session lifecycle and the terminal interface exist and are tested; nothing is connected to a model provider, and nothing touches your files. What you can run today is an architectural skeleton with an interface attached, which is more useful to read than to use. [ROADMAP.md](ROADMAP.md) says what is planned, in what order, and why that order.
 
-**Status: early. The terminal interface and the session lifecycle model are real and tested. Nothing is connected to a model provider, and nothing touches your workspace yet.** See [ROADMAP.md](ROADMAP.md) for what is planned and in what order.
+## Who might want this
 
-## Who it is for
+Someone who has watched an assistant report success for work it never ran, and who would rather have a tool that distinguishes a proposal from an approval, and an approval from something that actually happened. Someone who needs to answer, later, why a change was made and what evidence supported it. It is not yet a tool you would use to get work done, and it will say so rather than pretend otherwise.
 
-- Developers who want an agent that distinguishes a proposal from an approval, and an approval from an executed effect.
-- Teams who need an audit trail of decisions and evidence, not just a record of edits.
-- Anyone who has had an assistant report success for work it never verified.
+## What exists
 
-It is not yet useful as a daily driver. Today it is a working architectural skeleton you can run and read.
+The session model keeps apart the states that are easy to conflate: an input that has been admitted, an input that has become visible to the model, an operation that is pending, running, interrupted, of unknown outcome, or settled, and an effect that is intended, recorded, observed, or unknown. The interface renders those states and never performs an effect itself; a keystroke becomes a typed intent, and only the session changes anything.
 
-## What works today
+Snapshots given to the interface are immutable and shared. The session publishes a new one after each change, carrying the most recent durable events and a cursor; the full history is read back through that cursor rather than copied into every frame.
 
-- A terminal-independent session lifecycle model that keeps admission, promotion to model-visible history, operations, execution attempts, live observations, durable events, and settlement as separate states.
-- Immutable shared UI snapshots, published once per state change, carrying a bounded tail of recent durable events. Full history is read back through a replay cursor.
-- A terminal interface built on FTXUI that renders those states and never performs effects itself: keys become typed intents, and only the session changes state.
-- Cancellation and reconciliation that respect what is actually known. Cancelling before dispatch is a known outcome; cancelling after dispatch is explicitly unknown, and reconciliation never invents a result.
-- A headless mode that drives the same session through the same key translation and prints a plain-text snapshot, so the behavior can be checked without a terminal.
-- 23 tests covering lifecycle transitions, the snapshot contract, key translation, rendering, and headless behavior.
+Cancellation respects what is actually known. Cancelling before anything was dispatched is a known outcome, since no effect was attempted. Cancelling after dispatch is not, and the operation says so instead of claiming it stopped. Reconciliation applies only to operations in that unknown state, and it never invents a result it did not observe.
 
-## What does not work yet
+A keystroke becomes a Bernstein key event before it becomes anything else, so the path from input to intent knows nothing about the terminal library: the library that owns it links no FTXUI, and a build with the interface switched off contains no reference to FTXUI at all. There is also a headless mode that drives the same session through the same translation and prints plain text, so the behaviour can be checked without a terminal. Twenty-five tests cover the lifecycle transitions, the snapshot contract, key translation, rendering, and the headless path.
 
-- No model provider. There is a deterministic in-memory session used as the reference model for lifecycle semantics.
-- No workspace changes, no command execution, no sandboxing, no capability enforcement.
-- No persistence. Everything is lost when the process exits.
-- No navigation, inspection, approval, or diff views in the interface.
-- The OCaml reasoner and the C++/OCaml protocol are described but not implemented.
+## What does not exist
+
+No model provider; the session is deterministic and in memory, and serves as the reference for what the lifecycle means. No changes to your workspace, no commands run, no sandboxing, no capability enforcement. No persistence, so everything is lost when the process exits. No navigation, inspection, approval, or diff views in the interface. The OCaml reasoner and the protocol between it and the host are described in [docs/rfc-0001-core-interfaces.md](docs/rfc-0001-core-interfaces.md) and not built.
 
 ## Built with
 
 | Area | Choice |
 | --- | --- |
-| Language | C++23 (the operational host) |
-| Build | CMake 3.28+ with presets, Ninja |
+| Language | C++23, which hosts anything effectful |
+| Build | CMake 3.28 or newer with presets, Ninja |
 | Dependencies | Conan 2, pinned by `conan.lock` |
-| Terminal UI | FTXUI 7.0.3 |
-| Tests | Catch2 3 with CTest |
+| Terminal interface | FTXUI 7.0.3 |
+| Tests | Catch2 3 under CTest |
 | Libraries | fmt, spdlog, nlohmann_json, CLI11 |
-| Reasoning layer | OCaml with Dune (package skeleton) |
+| Reasoning layer | OCaml with Dune, currently a package skeleton |
 | Tasks | just |
 | Quality | clang-format, clang-tidy, cppcheck, cmake-format, pre-commit |
 
-C++ is the host because it owns effects and mediation. OCaml is kept narrowly scoped to architecture and policy semantics behind a versioned contract.
+C++ hosts the parts that cause effects. OCaml is confined to architecture and policy semantics behind a versioned contract, which keeps the formal part of the system small enough to test properly.
 
-## Getting started
+## Building it
 
-Requirements: a C++23 compiler, CMake 3.28+, Ninja, Conan 2, and Python 3 for the formatting tools. Building the terminal interface also needs clang-tidy only when you use the `ci` preset.
+You need a C++23 compiler, CMake 3.28 or newer, Ninja, Conan 2, and Python 3 for the formatting tools. clang-tidy is needed only for the `ci` preset.
 
-On macOS, one script installs the whole toolchain through Homebrew:
+On macOS one script installs the toolchain through Homebrew:
 
 ```bash
 ./scripts/bootstrap-dev.sh
 ```
 
-On Linux, install the equivalents of [Brewfile](Brewfile) with your package manager, then `pip install conan cmakelang`.
-
-Build and test:
+On Linux, install the equivalents of what [Brewfile](Brewfile) lists, then `pip install conan cmakelang`.
 
 ```bash
 just setup
@@ -68,9 +57,9 @@ just build
 just test
 ```
 
-`just configure` resolves the pinned Conan dependencies and generates a Ninja build under `build/dev`. `just quality` formats, lints, and tests. `just reasoner-build` builds the OCaml package once opam dependencies are installed.
+`just configure` resolves the pinned dependencies and generates a Ninja build under `build/dev`. `just quality` formats, lints, and tests. `just reasoner-build` builds the OCaml package once its opam dependencies are present.
 
-Without `just`, the same thing by hand:
+The same thing without `just`:
 
 ```bash
 conan install . --lockfile=conan.lock --output-folder build/conan/dev --build missing -s build_type=Debug -s compiler.cppstd=23
@@ -79,34 +68,36 @@ cmake --build --preset dev
 ctest --preset dev --output-on-failure
 ```
 
-## Running the terminal interface
+## Running it
 
 ```bash
 build/dev/apps/bernstein-agent-tui/bernstein-agent-tui
 ```
 
-Type a request and press Enter. The entry appears with its lifecycle state, and a simulated operation advances from pending to running to settled. Operations run one at a time.
+Type something and press Enter. The entry appears marked as admitted but not yet visible to the model, with an operation beside it in the pending state. A moment later the input is promoted, the operation starts running, and then settles, and each of those transitions adds a durable event to the activity region with its sequence number. Submit a second request while the first is still working and it waits: operations run one at a time, which is a simplification the roadmap intends to revisit rather than a property worth keeping.
+
+Press Ctrl+X while an operation is running and the result is instructive. The operation does not report that it was cancelled, because the host cannot know that; it reports an unknown outcome, in red, and Ctrl+R then records that reconciliation found nothing to resolve it.
 
 | Key | Effect |
 | --- | --- |
 | Enter | Submit the draft as an input |
-| Backspace | Delete one character, UTF-8 aware |
+| Backspace | Delete one character, counted in code points rather than bytes |
 | Esc or Ctrl+U | Clear the draft |
 | Ctrl+X | Cancel the oldest active operation |
-| Ctrl+R | Reconcile the newest operation with an unknown outcome |
+| Ctrl+R | Reconcile the newest operation of unknown outcome |
 | Ctrl+C | Quit |
 
-A terminal smaller than 60x20 shows a diagnostic instead of a clipped layout.
+Below 60 by 20 the interface stops drawing the layout and says the terminal is too small, on the grounds that a clipped view of lifecycle state is worse than no view.
 
-Headless, for scripting or for checking behavior without a terminal:
+For a snapshot without a terminal:
 
 ```bash
 printf 'first request\nsecond request\n' | build/dev/apps/bernstein-agent-tui/bernstein-agent-tui --headless
 ```
 
-It reads input lines, runs them through the same key translation, advances the simulation until nothing is active, and prints a plain-text snapshot with no escape sequences.
+It reads lines, runs them through the same translation the keyboard uses, advances the simulation until nothing is active, and prints plain text with no escape sequences.
 
-Build without the terminal interface and its dependency:
+To build without the interface and its dependency:
 
 ```bash
 cmake --preset dev -DBERNSTEIN_BUILD_TUI=OFF
@@ -115,32 +106,33 @@ cmake --preset dev -DBERNSTEIN_BUILD_TUI=OFF
 ## Layout
 
 ```text
-apps/bernstein-agent/      Command-line entry point (placeholder).
-apps/bernstein-agent-tui/  Terminal interface: rendering, key translation, headless driver.
+apps/bernstein-agent/      Command-line entry point, currently a placeholder.
+apps/bernstein-agent-tui/  The interface: rendering, the loop, the terminal-event adapter.
 apps/bernstein-sdlc/       Reserved for a later lifecycle-coordination executable.
-libs/bernstein-core/       Session lifecycle model, facade, and UI projection.
-libs/bernstein-protocol/   Reserved for the host/reasoner boundary types.
-ocaml/                     Architecture and policy reasoner package (skeleton).
-protocol/                  Host/reasoner protocol documentation.
-docs/                      Design, implementation plan, results, and manual scenarios.
-tests/                     Catch2 tests for the core model and the interface.
+libs/bernstein-core/       Session lifecycle, facade, and projection.
+libs/bernstein-input/      Key events and the translation from a keystroke to a typed intent.
+libs/bernstein-protocol/   Reserved for the host and reasoner boundary types.
+ocaml/                     Architecture and policy reasoner, a skeleton.
+protocol/                  The boundary between host and reasoner, described.
+docs/                      Design, plan, results, scenarios, and RFC 0001.
+tests/                     Catch2 tests for the model and the interface.
 ```
 
-## Documentation
+## Documents
 
-- [Terminal interface design](docs/ftxui-spike.md)
-- [Implementation plan](docs/ftxui-spike-implementation-plan.md)
-- [Results and decision record](docs/tui-results.md), including the evidence boundaries and known gaps
-- [Manual terminal scenarios](docs/tui-manual-scenarios.md)
-- [Roadmap](ROADMAP.md)
+- [RFC 0001](docs/rfc-0001-core-interfaces.md) is the one to read first. It describes the boundary between proposing an action and taking one, which is the reason the rest of the code is shaped as it is. Almost none of it is built yet, and it says so.
+- [Terminal interface design](docs/ftxui-spike.md) and the [implementation plan](docs/ftxui-spike-implementation-plan.md).
+- [Results and decision record](docs/tui-results.md), which carries the evidence behind the claims above along with its own limits.
+- [Manual terminal scenarios](docs/tui-manual-scenarios.md), for the behaviour a test cannot establish.
+- [ROADMAP.md](ROADMAP.md).
 
-## How this project treats evidence
+## On the claims in this repository
 
-Claims in this repository are meant to name their own limits. Compilation, a single test, the configured suite, a scripted terminal run, and human review are different claims, and the results document says which was actually done. If something was not verified, it is listed as a gap rather than described as working.
+Compiling, passing one test, passing the configured suite, a scripted run in a pseudo-terminal, and a person actually looking at the screen are five different claims, and the results document says which of them was made. Where something was not checked it is recorded as a gap rather than described as working. This is tiresome to write and it is the only way the evidence is worth anything.
 
 ## Contributing
 
-The roadmap is the current plan, and the open questions in it are genuinely open. Small, self-contained changes with their verification stated are easiest to review.
+The roadmap is the current plan and its open questions are genuinely open. Small self-contained changes that state what was verified are the easiest to review.
 
 ## License
 

@@ -1,7 +1,8 @@
 #include "bernstein/core/session.hpp"
+#include "bernstein/input/intent.hpp"
 #include "headless.hpp"
-#include "input_intent.hpp"
 #include "projection_view.hpp"
+#include "terminal_keys.hpp"
 
 #include <chrono>
 #include <condition_variable>
@@ -36,7 +37,7 @@ int run_terminal() {
     using namespace ftxui;
 
     bernstein::core::FakeSession session;
-    bernstein::tui::ComposerState composer;
+    bernstein::input::ComposerState composer;
     auto app = App::Fullscreen();
     app.ForceHandleCtrlC(false);
 
@@ -54,8 +55,8 @@ int run_terminal() {
             (void)session.simulate_next();
             return true;
         }
-        auto translation =
-            bernstein::tui::translate_event(event, std::move(composer), displayed->operations);
+        auto translation = bernstein::input::translate_event(
+            bernstein::tui::from_terminal(event), std::move(composer), displayed->operations);
         composer = std::move(translation.composer);
         if (translation.intent.has_value()) {
             if (std::holds_alternative<bernstein::core::Quit>(*translation.intent)) {
