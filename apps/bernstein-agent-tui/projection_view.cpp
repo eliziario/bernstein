@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <string>
 
 namespace bernstein::tui {
@@ -76,9 +77,8 @@ ftxui::Element render_conversation(const core::UiProjection& projection) {
     using namespace ftxui;
 
     Elements entries;
-    for (const auto& input : projection.inputs) {
-        entries.push_back(render_input(projection, input));
-    }
+    std::transform(projection.inputs.begin(), projection.inputs.end(), std::back_inserter(entries),
+                   [&projection](const auto& input) { return render_input(projection, input); });
     if (entries.empty()) {
         entries.push_back(text("No input yet. Describe what you want Bernstein to do.") | dim);
     }
