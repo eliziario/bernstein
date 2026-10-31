@@ -1,12 +1,68 @@
 # Bernstein
 
-Bernstein is a coding agent built on the assumption that the interesting unit of work is not a diff. It is a decision, the parts of the design that decision touches, the implementation that follows from it, the evidence that the implementation does what was intended, and whatever uncertainty is left over. Those five things tend to arrive in a chat transcript flattened into one undifferentiated stream, where a plausible suggestion and a verified result look alike. Keeping them apart is the whole point of the project.
+Bernstein is a coding agent built for advanced developers for architecturally relevant work. It is intended to act as a pair programmer to the developer, instead of a task-executing subordinate. By design the model's text is not authority: an effect happens only where policy written as code permits that exact action, and what was permitted, on what evidence, is recorded.
 
-It is early. The session lifecycle and the terminal interface exist and are tested; nothing is connected to a model provider, and nothing touches your files. What you can run today is an architectural skeleton with an interface attached, which is more useful to read than to use. [ROADMAP.md](ROADMAP.md) says what is planned, in what order, and why that order.
+The code is in its early stage. The session lifecycle and the terminal interface exist and are tested; nothing is connected to a model provider, and nothing touches your files. What you can run today is an architectural skeleton with an interface attached, which is more useful to read than to use. [ROADMAP.md](ROADMAP.md) says what is planned, in what order, and why that order.
+
+## What it is trying to do
+
+Two concerns carry equal weight. One is the working lifecycle: the review of an agent's work should happen while the work is happening, the way it does when two people share a keyboard, rather than afterwards as a diff somebody has to read. The other is that no tool call should run merely because a model asked for it; an effect should pass a gate made of rules that are code, type-checked, and evaluated the same way every time. Two further goals follow from those. The agent builds the checks for its own change, and something other than the agent decides whether they were enough. And the decisions reached along the way stay on the record, with their rationale and the alternatives that were rejected.
+
+### Pairing instead of reviewing
+
+Working with a coding agent usually means describing a task, waiting, and reading a diff. The reading is where the cost is. Whoever wrote the change knew which alternatives were considered, which files were opened and discarded, which function was left alone deliberately; a patch records none of this, so the reader reconstructs it from the result. This reconstruction is what people mean by the review tax. It is slow, it is approximate, and it grows with the size of the change.
+
+Extreme programming dealt with the problem by not letting the work accumulate. The second person in a pair watches the decision being made, raises the objection while it still costs a sentence, and reconstructs nothing, having been present.
+
+Bernstein tries to arrange an agent session the same way. A decision is stated before the edit that follows from it. Intent and evidence are attached to the change instead of being left in a transcript. Approvals happen where the question is still small, which is also what keeps the admission step described below from becoming a prompt that appears every few seconds.
+
+This is why the session model separates an admitted input from a promoted one, a pending operation from a settled one, and an intended effect from an observed one. Those are the distinctions the second person would otherwise have to recover by reading, and they are the part that already exists.
+
+### Tool calls that pass a policy gate
+
+In the usual arrangement a model emits text describing a tool call and a loop runs it, which makes the text the authority. A shell tool accepts any program, so a rule about it says nothing finer than yes or no. The arguments need not come from the person's request: a file the model read, an issue, a dependency's README, or a web page can supply them, and a transcript does not distinguish those origins. When it goes wrong, the transcript is also all that remains.
+
+Bernstein treats model output as an `ActionProposal` — a request that may be structurally impeccable and carries no authority whatever. The host owns the only path from a proposal to an effect. Along it, the host validates the request against the schema for its kind, resolves the evidence bearing on it, asks the reasoner what current policy yields, discharges the obligations attached to that decision, mints a capability whose limits name this action and no other, runs the work in a worker holding only what the capability names, and records what happened. Any step may refuse, and a refusal is written down with its reason. The capability carries a credential reference and not a credential.
+
+The set of action kinds is short and contains no `RunShell`, no `RunSql`, and nothing resembling cloud administration. A kind becomes admissible when four things can be written for it: a parser for its arguments, a validator that rejects a malformed or dangerous one, an executor profile it runs under, and policy semantics that let a rule say something useful about it. `RunShell` has no possible validator, its argument being an arbitrary program.
+
+`RunBuild` and `RunTest` do execute arbitrary code, and they are admissible for a narrower reason: their arguments are not the model's. The command is resolved from configuration the project owns, and the proposal selects among what that configuration already defines. Running a repository's own test suite is not safe, since it runs whatever the repository contains and the build configuration itself may be hostile. The claim is only that the selection is outside the model's control; containment is a separate obligation belonging to the worker profile. A list of permitted tool names is not a sandbox.
+
+### Policy written as code
+
+The rules live in a language that is parsed and type-checked, not in a prompt. The reasoner evaluates them over a closed, versioned snapshot — the workspace, the project's build and test configuration, the declared constraints and invariants, the decisions a person has approved — and returns `Allow`, `Deny`, `RequireApproval`, or `Unknown`, with the obligations that come with it and references to the rules and evidence that produced it. The explanation is in those terms; a fluent paragraph from a model is not a derivation and is not accepted where one is expected.
+
+Relations in the manner of Datalog carry the questions that are naturally recursive: whether a module transitively depends on one it is forbidden to reach, whether a permission arrives through a chain of delegations. Typed predicates serve where a predicate suffices, and a bounded claim can be lowered to an SMT solver where that earns its weight. Datalog rather than Prolog, because the termination properties differ: pure positive Datalog over a finite universe terminates, and Prolog's search strategy offers no such guarantee. Those properties are also easy to lose, since arithmetic extensions can permit nontermination, as [Souffle documents](https://souffle-lang.github.io/tutorial), so the permitted fragment and the resource budget have to be stated rather than assumed. Negation and aggregation need stated semantics for a related reason: positive Datalog is monotone, and once negation or changing facts are admitted, adding a fact can withdraw an earlier `Allow`, which makes invalidation and re-evaluation part of the design rather than an afterthought.
+
+Determinism here means that the same complete semantic inputs yield the same semantic result, so a decision can be re-derived next month and argued about on its inputs. It does not mean the rules are sound, and it does not mean they capture the requirement anyone had in mind. Those are three claims and the system keeps them apart.
+
+`Allow` is a policy result and not a capability. `Unknown` authorizes nothing, and is recorded separately from `Deny` because the two call for different responses: `Deny` means policy was brought to bear and refused, while `Unknown` means it could not be brought to bear at all, the evidence being missing, stale, or of an unusable shape. A system unable to tell those apart will eventually trust a broken evidence pipeline that presents itself as a well-reasoned refusal.
+
+### Verifiers the agent writes
+
+An agent proposes checks readily. Give it a function and a claim about the function and it produces properties, cases, assertions, and invariants to state in the architecture language, including for code nobody had covered. The intention is to use that: let the agent build verifiers for the change in front of it, new ones included, and run them.
+
+Deciding that those verifiers were sufficient is a different job and not the agent's. Which checks are required follows from declared inputs — the snapshot, the normalized change, project-owned configuration, the affected modules and their dependency graph, the language module's capability profile, applicable policy — so the selection is reproducible and auditable rather than chosen by the model partway through a task. A gap in coverage is recorded as a gap. A test edited after it failed does not resume standing as evidence for the behaviour it checked before the edit; editing a test changes the verification contract and is reviewed on those terms.
+
+### Decisions that stay on the record
+
+The project model is versioned and shared between people and agent sessions: the goals and current scope, the architectural decisions and why they were made, the invariants and boundaries and who owns them, the modules and dependencies and tasks and changes, the evidence gathered, and the questions still open. An agent may maintain it and query it. An agent is not its authority.
+
+The practical effect is that an agent cannot quietly redefine something that was decided. A design change is a proposal, and a proposal names the alternatives, the consequences, the objects it affects, and the approval it needs. This is the lightest of the four goals in terms of mechanism and the easiest to lose, since nothing in a transcript objects when a rationale goes missing.
+
+## Where the shape comes from
+
+A generative part that proposes and a separate, non-generative part that constrains is not our idea, and the arguments for it are better repeated as the people who made them put them.
+
+LeCun's objection to autoregressive models is that a model emitting one token at a time, each conditioned on its own previous output, has nothing in it that compares the result against an objective, and that errors therefore accumulate along the sequence. Scale does not supply the missing piece. His remedy is structural: the part that proposes and the part that optimises are separate parts, and the system searches for an output satisfying stated objectives. His own version of that optimisation is learned and differentiable — he has no interest in a logic engine.
+
+Marcus argues the hybrid case directly. Pattern completion and symbol manipulation do different work, and a dependable system needs both.
+
+Bernstein takes the division of labour from the first argument and builds it from the materials of the second: logic programming for the relations, types for the rules, and a host that mediates effects. The model proposes. A symbolic reasoner over versioned, closed inputs says what the architecture and the policy allow. The C++ host carries out effects and mediates them. The constraint layer is a type-checked policy language rather than an energy function, which gives up generality in exchange for something a person can read and contradict.
 
 ## Who might want this
 
-Someone who has watched an assistant report success for work it never ran, and who would rather have a tool that distinguishes a proposal from an approval, and an approval from something that actually happened. Someone who needs to answer, later, why a change was made and what evidence supported it. It is not yet a tool you would use to get work done, and it will say so rather than pretend otherwise.
+Someone who has watched an assistant report success for work it never ran, and who would rather have a tool that distinguishes a proposal from an approval, and an approval from something that actually happened. Someone unwilling to hand an agent a shell on a machine that matters, and unsatisfied by an allowlist of tool names. Someone who needs to answer, later, why a change was made, what permitted it, and what evidence supported it. It is not yet a tool you would use to get work done, and it will say so rather than pretend otherwise.
 
 ## What exists
 
@@ -18,9 +74,6 @@ Cancellation respects what is actually known. Cancelling before anything was dis
 
 A keystroke becomes a Bernstein key event before it becomes anything else, so the path from input to intent knows nothing about the terminal library: the library that owns it links no FTXUI, and a build with the interface switched off contains no reference to FTXUI at all. There is also a headless mode that drives the same session through the same translation and prints plain text, so the behaviour can be checked without a terminal. Twenty-five tests cover the lifecycle transitions, the snapshot contract, key translation, rendering, and the headless path.
 
-## What does not exist
-
-No model provider; the session is deterministic and in memory, and serves as the reference for what the lifecycle means. No changes to your workspace, no commands run, no sandboxing, no capability enforcement. No persistence, so everything is lost when the process exits. No navigation, inspection, approval, or diff views in the interface. The OCaml reasoner and the protocol between it and the host are described in [docs/rfc-0001-core-interfaces.md](docs/rfc-0001-core-interfaces.md) and not built.
 
 ## Built with
 
